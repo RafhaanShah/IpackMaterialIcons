@@ -1,0 +1,3 @@
+[submodule "external/icons"]
+	path = external/icons
+	url = https://github.com/Templarian/MaterialDesign
