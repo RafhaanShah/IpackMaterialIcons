@@ -32,14 +32,14 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-}
 
-val svgTask = tasks.register<SvgToVectorTask>("generateSvgVectors") {
-    inputDir = file("$projectDir/../external/icons/svg")
-}
-
-tasks.named("preBuild") {
-    dependsOn(svgTask)
+    androidResources {
+        // Force AAPT2 to use and emit stable IDs
+        additionalParameters.add("--emit-ids")
+        additionalParameters.add("${projectDir}/stable-ids.txt")
+        additionalParameters.add("--stable-ids")
+        additionalParameters.add("${projectDir}/stable-ids.txt")
+    }
 }
 
 androidComponents {
@@ -50,6 +50,14 @@ androidComponents {
             SvgToVectorTask::outputDir
         )
     }
+}
+
+val svgTask = tasks.register<SvgToVectorTask>("generateSvgVectors") {
+    inputDir = file("$projectDir/../external/icons/svg")
+}
+
+tasks.named("preBuild") {
+    dependsOn(svgTask)
 }
 
 abstract class SvgToVectorTask : DefaultTask() {
