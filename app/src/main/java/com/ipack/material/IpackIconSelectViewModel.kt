@@ -3,6 +3,7 @@ package com.ipack.material
 import android.app.Application
 import android.content.Intent
 import android.graphics.Point
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
@@ -17,11 +18,14 @@ data class IpackIconUiState(
     val cellSize: Int = 90,
     val iconSize: Int = 60,
     val gridBackColour: Int = 0x33777777,
-    val iconDimensions: Point? = null
+    val iconDimensions: Point? = null,
+    val label: String = IpackContent.LABEL,
+    val attribution: String = IpackContent.ATTRIBUTION,
 )
 
 class IpackIconSelectViewModel(application: Application) : AndroidViewModel(application) {
 
+    private val tag = IpackIconSelectViewModel::class.simpleName
     private val _uiState = MutableStateFlow(IpackIconUiState())
     val uiState: StateFlow<IpackIconUiState> = _uiState
 
@@ -38,21 +42,7 @@ class IpackIconSelectViewModel(application: Application) : AndroidViewModel(appl
                 IpackContent.getIcons()
             }
 
-            val iconDimensions = withContext(Dispatchers.Default) {
-                if (iconsList.isNotEmpty()) {
-                    val res = getApplication<Application>().resources
-                    try {
-                        val d = res.getDrawable(iconsList[0].id, null)
-                        val density = res.displayMetrics.density
-                        Point(
-                            (d.intrinsicWidth / density).toInt(),
-                            (d.intrinsicHeight / density).toInt()
-                        )
-                    } catch (_: Exception) {
-                        null
-                    }
-                } else null
-            }
+            val iconDimensions = getIconDimensions(iconsList)
 
             _uiState.value = IpackIconUiState(
                 icons = iconsList,
@@ -60,8 +50,28 @@ class IpackIconSelectViewModel(application: Application) : AndroidViewModel(appl
                 cellSize = cellSize,
                 iconSize = iconSize,
                 gridBackColour = gridBackColour,
-                iconDimensions = iconDimensions
+                iconDimensions = iconDimensions,
             )
         }
+    }
+
+    private suspend fun getIconDimensions(iconsList: List<IpackIcon>): Point? {
+        withContext(Dispatchers.Default) {
+            if (iconsList.isNotEmpty()) {
+                val res = getApplication<Application>().resources
+                try {
+                    val drawable = res.getDrawable(iconsList[0].id, null)
+                    val density = res.displayMetrics.density
+                    return@withContext Point(
+                        (drawable.intrinsicWidth / density).toInt(),
+                        (drawable.intrinsicHeight / density).toInt()
+                    )
+                } catch (e: Exception) {
+                    Log.e(tag, "getIconDimensions", e)
+                }
+            }
+        }
+
+        return null
     }
 }

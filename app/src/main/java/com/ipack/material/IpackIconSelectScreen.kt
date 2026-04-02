@@ -1,11 +1,11 @@
 package com.ipack.material
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -27,7 +27,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.Image
 
 @Composable
 fun IpackIconSelectScreen(
@@ -69,6 +68,8 @@ fun IpackIconHeader(uiState: IpackIconUiState) {
             .padding(8.dp)
     ) {
         val infoText = buildString {
+            append("${uiState.label}")
+            append("${uiState.attribution}")
             append("#${uiState.icons.size}")
             uiState.iconDimensions?.let {
                 append(" ${it.x}x${it.y}")
