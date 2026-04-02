@@ -8,6 +8,7 @@ object IpackKeys {
         const val NOTIFY_CANCEL: String = "net.dinglisch.android.ipack.actions.NOTIFY_CANCEL"
         const val QUERY_ICONS: String = "net.dinglisch.android.ipack.actions.QUERY_ICONS"
         const val QUERY_PACKS: String = "net.dinglisch.android.ipack.actions.QUERY_PACKS"
+        const val ICON_SELECT: String = "net.dinglisch.android.ipack.actions.ICON_SELECT"
     }
 
     object Extras {

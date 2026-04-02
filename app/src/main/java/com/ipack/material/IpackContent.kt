@@ -1,8 +1,6 @@
 package com.ipack.material
 
-import android.net.Uri
 import android.util.Log
-import androidx.core.net.toUri
 
 object IpackContent {
 
