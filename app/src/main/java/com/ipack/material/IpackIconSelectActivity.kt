@@ -2,7 +2,6 @@ package com.ipack.material
 
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -10,7 +9,6 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.core.content.ContextCompat.getSystemService
 import androidx.core.net.toUri
 import com.ipack.material.ui.theme.IpackMaterialIconsTheme
 

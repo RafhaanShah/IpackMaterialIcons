@@ -1,6 +1,11 @@
 package com.ipack.material
 
 import android.graphics.Point
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,7 +24,10 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -53,13 +61,18 @@ fun IpackIconSelectScreen(
     onIconSelected: (IpackIcon) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    IpackIconSelectContent(uiState, onIconSelected)
+    IpackIconSelectContent(
+        uiState = uiState,
+        onSearchQueryChanged = { viewModel.onSearchQueryUpdate(it) },
+        onIconSelected = onIconSelected
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IpackIconSelectContent(
     uiState: IpackIconUiState,
+    onSearchQueryChanged: (String) -> Unit,
     onIconSelected: (IpackIcon) -> Unit
 ) {
     val backgroundColor = if (uiState.gridBackColour != IpackContent.DEFAULT_GRID_BACK_COLOUR) {
@@ -87,25 +100,79 @@ fun IpackIconSelectContent(
                 .padding(paddingValues)
         ) {
             IpackIconHeader(uiState)
+            
+            SearchBar(
+                query = uiState.searchQuery,
+                onQueryChanged = onSearchQueryChanged,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(backgroundColor)
             ) {
-                if (uiState.isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                } else {
-                    IpackIconGrid(
-                        icons = uiState.icons,
-                        cellSize = uiState.cellSize,
-                        iconSize = uiState.iconSize,
-                        contentColor = contentColor,
-                        onIconSelected = onIconSelected
-                    )
+                AnimatedContent(
+                    targetState = uiState.isLoading,
+                    transitionSpec = {
+                        fadeIn(animationSpec = tween(300)) togetherWith 
+                        fadeOut(animationSpec = tween(300))
+                    },
+                    label = "ContentTransition"
+                ) { loading ->
+                    if (loading) {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                        }
+                    } else {
+                        IpackIconGrid(
+                            icons = uiState.icons,
+                            cellSize = uiState.cellSize,
+                            iconSize = uiState.iconSize,
+                            contentColor = contentColor,
+                            onIconSelected = onIconSelected
+                        )
+                    }
                 }
             }
         }
     }
+}
+
+@Composable
+fun SearchBar(
+    query: String,
+    onQueryChanged: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChanged,
+        modifier = modifier,
+        placeholder = { Text("Search icons...") },
+        leadingIcon = {
+            Icon(
+                painter = painterResource(id = com.ipack.icons.R.drawable.search_web),
+                contentDescription = null,
+                modifier = Modifier.size(24.dp)
+            )
+        },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                IconButton(onClick = { onQueryChanged("") }) {
+                    Icon(
+                        painter = painterResource(id = com.ipack.icons.R.drawable.close),
+                        contentDescription = "Clear search",
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+        },
+        singleLine = true,
+        shape = MaterialTheme.shapes.medium
+    )
 }
 
 @Composable
@@ -163,7 +230,10 @@ fun IpackIconGrid(
         contentPadding = PaddingValues(10.dp),
         modifier = Modifier.fillMaxSize()
     ) {
-        items(icons) { icon ->
+        items(
+            items = icons,
+            key = { it.resourceName } // Using resourceName as key for better performance during filtering
+        ) { icon ->
             IpackIconItem(
                 icon = icon,
                 cellSize = cellSize,
@@ -184,7 +254,6 @@ fun IpackIconItem(
     onClick: () -> Unit
 ) {
     // Inject zero-width spaces after underscores to allow wrapping while keeping the underscore
-    // Also works for existing spaces.
     val wrappedName = icon.name.replace("_", "_\u200B")
     
     Column(
@@ -260,6 +329,7 @@ fun IpackIconSelectContentPreview() {
                 gridBackColour = IpackContent.DEFAULT_GRID_BACK_COLOUR,
                 attribution = IpackContent.ATTRIBUTION
             ),
+            onSearchQueryChanged = {},
             onIconSelected = {}
         )
     }
