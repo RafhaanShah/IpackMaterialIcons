@@ -1,6 +1,9 @@
 package com.ipack.material
 
+import android.app.Activity
+import android.content.Intent
 import android.graphics.Point
+import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -13,15 +16,19 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -30,15 +37,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
@@ -53,27 +62,70 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ipack.material.ui.theme.IpackMaterialIconsTheme
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class SelectDestination(val intentAction: String? = null)
 
 @Composable
-fun IpackIconSelectScreen(
-    viewModel: IpackIconSelectViewModel,
-    onIconSelected: (IpackIcon) -> Unit
+fun IpackIconSelectRoute(
+    onNavigateToExport: (IpackIcon) -> Unit,
+    viewModel: IpackIconSelectViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    IpackIconSelectContent(
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        viewModel.events.collectLatest { event ->
+            when (event) {
+                is IpackIconSelectEvent.NavigateToExport -> {
+                    onNavigateToExport(event.icon)
+                }
+
+                is IpackIconSelectEvent.FinishWithResult -> {
+                    context.findActivity()?.let { activity ->
+                        val result = Intent().apply {
+                            data = event.dataString.toUri()
+                            putExtra(IpackKeys.Extras.ICON_LABEL, event.icon.name)
+                            putExtra(IpackKeys.Extras.ICON_NAME, event.icon.resourceName)
+                            putExtra(IpackKeys.Extras.ICON_ID, event.icon.id)
+                        }
+                        activity.setResult(Activity.RESULT_OK, result)
+                        activity.finish()
+                    }
+                }
+
+                is IpackIconSelectEvent.ShowToast -> {
+                    Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    IpackIconSelectScreen(
         uiState = uiState,
-        onSearchQueryChanged = { viewModel.onSearchQueryUpdate(it) },
-        onIconSelected = onIconSelected
+        onSearchQueryChanged = viewModel::onSearchQueryUpdate,
+        onIconSelected = viewModel::onIconSelected,
+        onDismissPopup = viewModel::onDismissPopup,
+        onCopyAction = viewModel::onCopyAction,
+        onExportAction = viewModel::onExportAction
     )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun IpackIconSelectContent(
+fun IpackIconSelectScreen(
     uiState: IpackIconUiState,
     onSearchQueryChanged: (String) -> Unit,
-    onIconSelected: (IpackIcon) -> Unit
+    onIconSelected: (IpackIcon) -> Unit,
+    onDismissPopup: () -> Unit,
+    onCopyAction: (IpackIcon) -> Unit,
+    onExportAction: (IpackIcon) -> Unit
 ) {
     val backgroundColor = if (uiState.gridBackColour != IpackContent.DEFAULT_GRID_BACK_COLOUR) {
         Color(uiState.gridBackColour)
@@ -85,6 +137,24 @@ fun IpackIconSelectContent(
         if (backgroundColor.luminance() > 0.5f) Color.Black else Color.White
     } else {
         MaterialTheme.colorScheme.onSurface
+    }
+
+    if (uiState.selectedIconForPopup != null) {
+        AlertDialog(
+            onDismissRequest = onDismissPopup,
+            title = { Text(text = uiState.selectedIconForPopup.name) },
+            text = { Text("What would you like to do?") },
+            confirmButton = {
+                TextButton(onClick = { onExportAction(uiState.selectedIconForPopup) }) {
+                    Text("Export icon as a PNG")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { onCopyAction(uiState.selectedIconForPopup) }) {
+                    Text("Copy Resource URI for Tasker")
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -127,12 +197,14 @@ fun IpackIconSelectContent(
                             CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                         }
                     } else {
+                        val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
                         IpackIconGrid(
                             icons = uiState.icons,
                             cellSize = uiState.cellSize,
                             iconSize = uiState.iconSize,
                             contentColor = contentColor,
-                            onIconSelected = onIconSelected
+                            onIconSelected = onIconSelected,
+                            bottomPadding = navBarPadding.calculateBottomPadding()
                         )
                     }
                 }
@@ -223,16 +295,22 @@ fun IpackIconGrid(
     cellSize: Int,
     iconSize: Int,
     contentColor: Color,
-    onIconSelected: (IpackIcon) -> Unit
+    onIconSelected: (IpackIcon) -> Unit,
+    bottomPadding: androidx.compose.ui.unit.Dp = 0.dp
 ) {
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = cellSize.dp),
-        contentPadding = PaddingValues(10.dp),
+        contentPadding = PaddingValues(
+            start = 10.dp,
+            top = 10.dp,
+            end = 10.dp,
+            bottom = 10.dp + bottomPadding
+        ),
         modifier = Modifier.fillMaxSize()
     ) {
         items(
             items = icons,
-            key = { it.resourceName } // Using resourceName as key for better performance during filtering
+            key = { it.resourceName }
         ) { icon ->
             IpackIconItem(
                 icon = icon,
@@ -253,7 +331,6 @@ fun IpackIconItem(
     contentColor: Color,
     onClick: () -> Unit
 ) {
-    // Inject zero-width spaces after underscores to allow wrapping while keeping the underscore
     val wrappedName = icon.name.replace("_", "_\u200B")
     
     Column(
@@ -322,7 +399,7 @@ fun IpackIconItemPreview() {
 @Composable
 fun IpackIconSelectContentPreview() {
     IpackMaterialIconsTheme {
-        IpackIconSelectContent(
+        IpackIconSelectScreen(
             uiState = IpackIconUiState(
                 icons = List(100) { IpackIcon(android.R.drawable.ic_menu_gallery, "icon $it", "icon_$it") },
                 isLoading = false,
@@ -330,7 +407,10 @@ fun IpackIconSelectContentPreview() {
                 attribution = IpackContent.ATTRIBUTION
             ),
             onSearchQueryChanged = {},
-            onIconSelected = {}
+            onIconSelected = {},
+            onDismissPopup = {},
+            onCopyAction = {},
+            onExportAction = {}
         )
     }
 }

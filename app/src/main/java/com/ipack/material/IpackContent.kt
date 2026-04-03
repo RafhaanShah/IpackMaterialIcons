@@ -1,5 +1,6 @@
 package com.ipack.material
 
+import android.content.Context
 import android.util.Log
 
 object IpackContent {
@@ -28,5 +29,10 @@ object IpackContent {
                 null
             }
         }.sortedBy { it.name.lowercase() }
+    }
+
+    fun getIcon(context: Context, id: Int): IpackIcon {
+        val name = context.resources.getResourceEntryName(id)
+        return IpackIcon(id = id, name = name, resourceName = name)
     }
 }

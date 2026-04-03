@@ -1,17 +1,24 @@
 package com.ipack.material
 
-import android.app.Application
-import android.content.Intent
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.graphics.Point
 import android.util.Log
-import androidx.core.os.bundleOf
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.navigation.toRoute
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -20,6 +27,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import javax.inject.Inject
 
 data class IpackIconUiState(
     val icons: List<IpackIcon> = emptyList(),
@@ -32,18 +40,39 @@ data class IpackIconUiState(
     val iconDimensions: Point? = null,
     val label: String = IpackContent.LABEL,
     val attribution: String = IpackContent.ATTRIBUTION,
+    val isSelectAction: Boolean = false,
+    val selectedIconForPopup: IpackIcon? = null
 )
 
+sealed class IpackIconSelectEvent {
+    data class FinishWithResult(val icon: IpackIcon, val dataString: String) :
+        IpackIconSelectEvent()
+
+    data class NavigateToExport(val icon: IpackIcon) : IpackIconSelectEvent()
+    data class ShowToast(val message: String) : IpackIconSelectEvent()
+}
+
+@HiltViewModel
 @OptIn(FlowPreview::class)
-class IpackIconSelectViewModel(application: Application) : AndroidViewModel(application) {
+class IpackIconSelectViewModel @Inject constructor(
+    @param:ApplicationContext private val context: Context,
+    savedStateHandle: SavedStateHandle
+) : ViewModel() {
 
     private val tag = IpackIconSelectViewModel::class.simpleName
 
     private val _searchQuery = MutableStateFlow("")
-    private val _baseUiState = MutableStateFlow(IpackIconUiState())
+    private val _baseUiState = MutableStateFlow(
+        IpackIconUiState(
+            isSelectAction = savedStateHandle.toRoute<SelectDestination>().intentAction == IpackKeys.Actions.ICON_SELECT
+        )
+    )
     private val _isLoading = MutableStateFlow(true)
 
-    // Filtering flow: debounced and offloaded to Default dispatcher
+    private val _events = MutableSharedFlow<IpackIconSelectEvent>()
+    val events: SharedFlow<IpackIconSelectEvent> = _events.asSharedFlow()
+
+    // Filtering flow
     private val _filteredIcons = combine(
         _searchQuery.debounce(300L),
         _baseUiState.map { state -> state.allIcons }.distinctUntilChanged()
@@ -60,7 +89,6 @@ class IpackIconSelectViewModel(application: Application) : AndroidViewModel(appl
         filtered
     }
 
-    // Final UI state: combines metadata, immediate query, and debounced filtered results
     val uiState: StateFlow<IpackIconUiState> = combine(
         _baseUiState,
         _searchQuery,
@@ -78,25 +106,16 @@ class IpackIconSelectViewModel(application: Application) : AndroidViewModel(appl
         initialValue = IpackIconUiState()
     )
 
-    fun onSearchQueryUpdate(query: String) {
-        if (_searchQuery.value != query) {
-            _searchQuery.value = query
-            _isLoading.value = true
-        }
-    }
-
-    fun loadIcons(intent: Intent) {
+    init {
         viewModelScope.launch {
             _isLoading.value = true
 
-            val extras = intent.extras ?: bundleOf()
-            val gridBackColour = extras.getInt(
-                IpackKeys.Extras.GRID_BACK_COLOUR,
-                IpackContent.DEFAULT_GRID_BACK_COLOUR
-            )
-            val cellSize = extras.getInt(IpackKeys.Extras.CELL_SIZE, IpackContent.DEFAULT_CELL_SIZE)
-            val iconSize =
-                extras.getInt(IpackKeys.Extras.ICON_DISPLAY_SIZE, IpackContent.DEFAULT_ICON_SIZE)
+            val gridBackColour: Int = savedStateHandle[IpackKeys.Extras.GRID_BACK_COLOUR]
+                ?: IpackContent.DEFAULT_GRID_BACK_COLOUR
+            val cellSize: Int =
+                savedStateHandle[IpackKeys.Extras.CELL_SIZE] ?: IpackContent.DEFAULT_CELL_SIZE
+            val iconSize: Int = savedStateHandle[IpackKeys.Extras.ICON_DISPLAY_SIZE]
+                ?: IpackContent.DEFAULT_ICON_SIZE
 
             withContext(Dispatchers.Default) {
                 val iconsList = IpackContent.getIcons()
@@ -115,8 +134,59 @@ class IpackIconSelectViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
+    fun onSearchQueryUpdate(query: String) {
+        if (_searchQuery.value != query) {
+            _searchQuery.value = query
+            _isLoading.value = true
+        }
+    }
+
+    fun onIconSelected(icon: IpackIcon) {
+        val state = uiState.value
+        if (state.isSelectAction) {
+            val dataString = getTaskerDataString(icon)
+            viewModelScope.launch {
+                _events.emit(IpackIconSelectEvent.ShowToast(dataString))
+                _events.emit(IpackIconSelectEvent.FinishWithResult(icon, dataString))
+            }
+        } else {
+            _baseUiState.update { it.copy(selectedIconForPopup = icon) }
+        }
+    }
+
+    fun onDismissPopup() {
+        _baseUiState.update { it.copy(selectedIconForPopup = null) }
+    }
+
+    fun onCopyAction(icon: IpackIcon) {
+        val dataString = getTaskerDataString(icon)
+        setClipboard(dataString)
+        _baseUiState.update { it.copy(selectedIconForPopup = null) }
+        viewModelScope.launch {
+            _events.emit(IpackIconSelectEvent.ShowToast(dataString))
+        }
+    }
+
+    fun onExportAction(icon: IpackIcon) {
+        _baseUiState.update { it.copy(selectedIconForPopup = null) }
+        viewModelScope.launch {
+            _events.emit(IpackIconSelectEvent.NavigateToExport(icon))
+        }
+    }
+
+    private fun getTaskerDataString(icon: IpackIcon): String {
+        return "${IpackKeys.ANDROID_RESOURCE_PREFIX}${context.packageName}/${icon.resourceName}"
+    }
+
+    private fun setClipboard(content: String) {
+        val clipboard =
+            context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText("Tasker Icon Resource", content)
+        clipboard.setPrimaryClip(clip)
+    }
+
     private fun getIconDimensions(iconsList: List<IpackIcon>): Point? {
-        val res = getApplication<Application>().resources
+        val res = context.resources
         try {
             val id = iconsList.firstOrNull()?.id ?: return null
             val drawable = res.getDrawable(id, null)
