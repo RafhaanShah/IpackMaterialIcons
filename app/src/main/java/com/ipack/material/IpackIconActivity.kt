@@ -27,7 +27,14 @@ class IpackIconActivity : ComponentActivity() {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    IpackAppNavigation(intentAction = intentAction)
+                    IpackAppNavigation(
+                        intentAction = intentAction,
+                        onResult = { resultCode, data ->
+                            Log.i(tag, "onResult: result:$resultCode data:${data?.dataString}")
+                            setResult(resultCode, data)
+                            finish()
+                        }
+                    )
                 }
             }
         }

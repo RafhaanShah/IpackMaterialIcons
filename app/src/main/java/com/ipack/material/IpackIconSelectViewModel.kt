@@ -1,10 +1,13 @@
 package com.ipack.material
 
+import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.graphics.Point
 import android.util.Log
+import androidx.core.net.toUri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -45,9 +48,7 @@ data class IpackIconUiState(
 )
 
 sealed class IpackIconSelectEvent {
-    data class FinishWithResult(val icon: IpackIcon, val dataString: String) :
-        IpackIconSelectEvent()
-
+    data class FinishWithResult(val resultCode: Int, val data: Intent) : IpackIconSelectEvent()
     data class NavigateToExport(val icon: IpackIcon) : IpackIconSelectEvent()
     data class ShowToast(val message: String) : IpackIconSelectEvent()
 }
@@ -148,12 +149,28 @@ class IpackIconSelectViewModel @Inject constructor(
             val dataString = getTaskerDataString(icon)
             viewModelScope.launch {
                 _events.emit(IpackIconSelectEvent.ShowToast(dataString))
-                _events.emit(IpackIconSelectEvent.FinishWithResult(icon, dataString))
+                _events.emit(
+                    IpackIconSelectEvent.FinishWithResult(
+                        Activity.RESULT_OK,
+                        getIntent(dataString, icon)
+                    )
+                )
             }
         } else {
             _baseUiState.update { it.copy(selectedIconForPopup = icon) }
         }
     }
+
+    private fun getIntent(
+        dataString: String,
+        icon: IpackIcon
+    ): Intent =
+        Intent().apply {
+            data = dataString.toUri()
+            putExtra(IpackKeys.Extras.ICON_LABEL, icon.name)
+            putExtra(IpackKeys.Extras.ICON_NAME, icon.resourceName)
+            putExtra(IpackKeys.Extras.ICON_ID, icon.id)
+        }
 
     fun onDismissPopup() {
         _baseUiState.update { it.copy(selectedIconForPopup = null) }

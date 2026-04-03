@@ -53,6 +53,8 @@ import com.github.skydoves.colorpicker.compose.AlphaSlider
 import com.github.skydoves.colorpicker.compose.BrightnessSlider
 import com.github.skydoves.colorpicker.compose.HsvColorPicker
 import com.github.skydoves.colorpicker.compose.rememberColorPickerController
+import com.ipack.material.IpackContent.PNG_EXTENSION
+import com.ipack.material.IpackContent.PNG_MIME_TYPE
 import com.ipack.material.ui.theme.IpackMaterialIconsTheme
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.serialization.Serializable
@@ -81,7 +83,7 @@ fun IpackIconExportRoute(
     }
 
     val exportLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("image/png")
+        contract = ActivityResultContracts.CreateDocument(PNG_MIME_TYPE)
     ) { uri ->
         uri?.let { viewModel.exportIcon(context, it) }
     }
@@ -96,7 +98,9 @@ fun IpackIconExportRoute(
         onUpdateIconSize = viewModel::updateIconSize,
         onExportConfirm = { fileName ->
             val finalFileName =
-                if (fileName.lowercase().endsWith(".png")) fileName else "$fileName.png"
+                if (fileName.lowercase()
+                        .endsWith(PNG_EXTENSION)
+                ) fileName else "$fileName$PNG_EXTENSION"
             exportLauncher.launch(finalFileName)
         }
     )
@@ -106,13 +110,13 @@ fun IpackIconExportRoute(
 @Composable
 fun IpackIconExportScreen(
     uiState: IpackIconExportUiState,
-    onBackClick: () -> Unit,
-    onShowDialog: (Boolean) -> Unit,
-    onUpdateColor: (Color) -> Unit,
-    onUpdateHexCode: (String) -> Unit,
-    onUpdateFileName: (String) -> Unit,
-    onUpdateIconSize: (String) -> Unit,
-    onExportConfirm: (String) -> Unit,
+    onBackClick: () -> Unit = {},
+    onShowDialog: (Boolean) -> Unit = {},
+    onUpdateColor: (Color) -> Unit = {},
+    onUpdateHexCode: (String) -> Unit = {},
+    onUpdateFileName: (String) -> Unit = {},
+    onUpdateIconSize: (String) -> Unit = {},
+    onExportConfirm: (String) -> Unit = {},
 ) {
     BackHandler(onBack = onBackClick)
 
@@ -325,13 +329,6 @@ fun IpackIconExportScreenPreview() {
                 fileName = "Gallery Icon",
                 selectedColor = Color.White
             ),
-            onBackClick = {},
-            onShowDialog = {},
-            onUpdateColor = {},
-            onUpdateHexCode = {},
-            onUpdateFileName = {},
-            onUpdateIconSize = {},
-            onExportConfirm = {}
         )
     }
 }

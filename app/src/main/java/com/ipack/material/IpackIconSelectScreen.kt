@@ -1,9 +1,9 @@
 package com.ipack.material
 
-import android.app.Activity
 import android.content.Intent
 import android.graphics.Point
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -62,12 +63,13 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ipack.material.ui.theme.IpackMaterialIconsTheme
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.serialization.Serializable
+import my.nanihadesuka.compose.LazyVerticalGridScrollbar
+import my.nanihadesuka.compose.ScrollbarSettings
 
 @Serializable
 data class SelectDestination(val intentAction: String? = null)
@@ -75,6 +77,7 @@ data class SelectDestination(val intentAction: String? = null)
 @Composable
 fun IpackIconSelectRoute(
     onNavigateToExport: (IpackIcon) -> Unit,
+    onResult: (Int, Intent?) -> Unit = { _, _ -> },
     viewModel: IpackIconSelectViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -88,16 +91,7 @@ fun IpackIconSelectRoute(
                 }
 
                 is IpackIconSelectEvent.FinishWithResult -> {
-                    context.findActivity()?.let { activity ->
-                        val result = Intent().apply {
-                            data = event.dataString.toUri()
-                            putExtra(IpackKeys.Extras.ICON_LABEL, event.icon.name)
-                            putExtra(IpackKeys.Extras.ICON_NAME, event.icon.resourceName)
-                            putExtra(IpackKeys.Extras.ICON_ID, event.icon.id)
-                        }
-                        activity.setResult(Activity.RESULT_OK, result)
-                        activity.finish()
-                    }
+                    onResult(event.resultCode, event.data)
                 }
 
                 is IpackIconSelectEvent.ShowToast -> {
@@ -121,12 +115,16 @@ fun IpackIconSelectRoute(
 @Composable
 fun IpackIconSelectScreen(
     uiState: IpackIconUiState,
-    onSearchQueryChanged: (String) -> Unit,
-    onIconSelected: (IpackIcon) -> Unit,
-    onDismissPopup: () -> Unit,
-    onCopyAction: (IpackIcon) -> Unit,
-    onExportAction: (IpackIcon) -> Unit
+    onSearchQueryChanged: (String) -> Unit = {},
+    onIconSelected: (IpackIcon) -> Unit = {},
+    onDismissPopup: () -> Unit = {},
+    onCopyAction: (IpackIcon) -> Unit = {},
+    onExportAction: (IpackIcon) -> Unit = {},
 ) {
+    BackHandler(enabled = uiState.searchQuery.isNotEmpty()) {
+        onSearchQueryChanged("")
+    }
+
     val backgroundColor = if (uiState.gridBackColour != IpackContent.DEFAULT_GRID_BACK_COLOUR) {
         Color(uiState.gridBackColour)
     } else {
@@ -298,27 +296,58 @@ fun IpackIconGrid(
     onIconSelected: (IpackIcon) -> Unit,
     bottomPadding: androidx.compose.ui.unit.Dp = 0.dp
 ) {
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = cellSize.dp),
-        contentPadding = PaddingValues(
-            start = 10.dp,
-            top = 10.dp,
-            end = 10.dp,
-            bottom = 10.dp + bottomPadding
+    val state = rememberLazyGridState()
+
+    LazyVerticalGridScrollbar(
+        state = state,
+        settings = ScrollbarSettings.Default.copy(
+            thumbUnselectedColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+            thumbSelectedColor = MaterialTheme.colorScheme.primary,
+            alwaysShowScrollbar = true
         ),
-        modifier = Modifier.fillMaxSize()
+        indicatorContent = { index, isThumbSelected ->
+            if (isThumbSelected) {
+                Box(
+                    modifier = Modifier
+                        .padding(end = 16.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shape = MaterialTheme.shapes.medium
+                        )
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = icons.getOrNull(index)?.name?.take(1)?.uppercase() ?: "",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+        }
     ) {
-        items(
-            items = icons,
-            key = { it.resourceName }
-        ) { icon ->
-            IpackIconItem(
-                icon = icon,
-                cellSize = cellSize,
-                iconSize = iconSize,
-                contentColor = contentColor,
-                onClick = { onIconSelected(icon) }
-            )
+        LazyVerticalGrid(
+            state = state,
+            columns = GridCells.Adaptive(minSize = cellSize.dp),
+            contentPadding = PaddingValues(
+                start = 10.dp,
+                top = 10.dp,
+                end = 10.dp,
+                bottom = 10.dp + bottomPadding
+            ),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            items(
+                items = icons,
+                key = { it.resourceName }
+            ) { icon ->
+                IpackIconItem(
+                    icon = icon,
+                    cellSize = cellSize,
+                    iconSize = iconSize,
+                    contentColor = contentColor,
+                    onClick = { onIconSelected(icon) }
+                )
+            }
         }
     }
 }
@@ -406,11 +435,6 @@ fun IpackIconSelectContentPreview() {
                 gridBackColour = IpackContent.DEFAULT_GRID_BACK_COLOUR,
                 attribution = IpackContent.ATTRIBUTION
             ),
-            onSearchQueryChanged = {},
-            onIconSelected = {},
-            onDismissPopup = {},
-            onCopyAction = {},
-            onExportAction = {}
         )
     }
 }

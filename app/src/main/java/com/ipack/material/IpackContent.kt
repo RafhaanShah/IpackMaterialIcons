@@ -13,7 +13,9 @@ object IpackContent {
     const val DEFAULT_ICON_SIZE: Int = 48
     const val DEFAULT_ICON_EXPORT_SIZE: Int = 128
     const val DEFAULT_GRID_BACK_COLOUR: Int = 0 // 0 indicates use theme default
-    const val HEX_FORMAT = "%08X"
+    const val HEX_FORMAT: String = "%08X"
+    const val PNG_MIME_TYPE: String = "image/png"
+    const val PNG_EXTENSION: String = ".png"
 
     private val tag = IpackContent::class.simpleName
 

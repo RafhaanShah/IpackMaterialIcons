@@ -3,6 +3,7 @@ package com.ipack.material
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.Intent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -15,7 +16,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 
 @Composable
-fun IpackAppNavigation(intentAction: String? = null) {
+fun IpackAppNavigation(
+    intentAction: String? = null,
+    onResult: (Int, Intent?) -> Unit = { _, _ -> }
+) {
     val navController = rememberNavController()
 
     NavHost(
@@ -31,7 +35,8 @@ fun IpackAppNavigation(intentAction: String? = null) {
             IpackIconSelectRoute(
                 onNavigateToExport = { icon ->
                     navController.navigate(ExportDestination(iconId = icon.id))
-                }
+                },
+                onResult = onResult,
             )
         }
         composable<ExportDestination> {
