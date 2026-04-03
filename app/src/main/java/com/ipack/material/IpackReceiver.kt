@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.util.Log
 import androidx.core.content.IntentCompat
 import com.ipack.material.IpackContent.getIcons
+import com.ipack.material.IpackContent.isDarkMode
 import com.ipack.material.IpackKeys.Actions
 
 
@@ -23,7 +24,7 @@ class IpackReceiver : BroadcastReceiver() {
             Actions.NOTIFY -> handleNotify(intent)
             Actions.NOTIFY_CANCEL -> handleNotifyCancel(intent)
             Actions.QUERY_PACKS -> handleQueryPacks(context)
-            Actions.QUERY_ICONS -> handleQueryIcons()
+            Actions.QUERY_ICONS -> handleQueryIcons(context)
             else -> Log.w(tag, "Unknown action: $action")
         }
     }
@@ -69,10 +70,11 @@ class IpackReceiver : BroadcastReceiver() {
         getResultExtras(true).putBundle(context.packageName, infoBundle)
     }
 
-    private fun handleQueryIcons() {
+    private fun handleQueryIcons(context: Context) {
+        val isDark = isDarkMode(context)
         val bundle = getResultExtras(true)
-        getIcons().forEach { icon ->
-            bundle.putInt(icon.name, icon.id)
+        getIcons(context).forEach { icon ->
+            bundle.putInt(icon.name, icon.getResId(isDark))
         }
     }
 }

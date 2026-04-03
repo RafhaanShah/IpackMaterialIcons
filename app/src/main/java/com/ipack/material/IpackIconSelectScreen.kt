@@ -15,11 +15,15 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
@@ -29,7 +33,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -37,8 +41,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -61,10 +65,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ipack.icons.R
 import com.ipack.material.ui.theme.IpackMaterialIconsTheme
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.serialization.Serializable
@@ -106,7 +113,7 @@ fun IpackIconSelectRoute(
         onSearchQueryChanged = viewModel::onSearchQueryUpdate,
         onIconSelected = viewModel::onIconSelected,
         onDismissPopup = viewModel::onDismissPopup,
-        onCopyAction = viewModel::onCopyAction,
+        onVariantSelected = viewModel::onVariantSelected,
         onExportAction = viewModel::onExportAction
     )
 }
@@ -118,7 +125,7 @@ fun IpackIconSelectScreen(
     onSearchQueryChanged: (String) -> Unit = {},
     onIconSelected: (IpackIcon) -> Unit = {},
     onDismissPopup: () -> Unit = {},
-    onCopyAction: (IpackIcon) -> Unit = {},
+    onVariantSelected: (IpackIcon, Boolean) -> Unit = { _, _ -> },
     onExportAction: (IpackIcon) -> Unit = {},
 ) {
     BackHandler(enabled = uiState.searchQuery.isNotEmpty()) {
@@ -138,20 +145,12 @@ fun IpackIconSelectScreen(
     }
 
     if (uiState.selectedIconForPopup != null) {
-        AlertDialog(
+        IpackIconSelectionDialog(
+            icon = uiState.selectedIconForPopup,
+            isSelectAction = uiState.isSelectAction,
             onDismissRequest = onDismissPopup,
-            title = { Text(text = uiState.selectedIconForPopup.name) },
-            text = { Text("What would you like to do?") },
-            confirmButton = {
-                TextButton(onClick = { onExportAction(uiState.selectedIconForPopup) }) {
-                    Text("Export icon as a PNG")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { onCopyAction(uiState.selectedIconForPopup) }) {
-                    Text("Copy Resource URI for Tasker")
-                }
-            }
+            onVariantSelected = onVariantSelected,
+            onExportAction = onExportAction
         )
     }
 
@@ -168,7 +167,6 @@ fun IpackIconSelectScreen(
                 .padding(paddingValues)
         ) {
             IpackIconHeader(uiState)
-            
             SearchBar(
                 query = uiState.searchQuery,
                 onQueryChanged = onSearchQueryChanged,
@@ -185,8 +183,8 @@ fun IpackIconSelectScreen(
                 AnimatedContent(
                     targetState = uiState.isLoading,
                     transitionSpec = {
-                        fadeIn(animationSpec = tween(300)) togetherWith 
-                        fadeOut(animationSpec = tween(300))
+                        fadeIn(animationSpec = tween(300)) togetherWith
+                                fadeOut(animationSpec = tween(300))
                     },
                     label = "ContentTransition"
                 ) { loading ->
@@ -212,6 +210,80 @@ fun IpackIconSelectScreen(
 }
 
 @Composable
+fun IpackIconSelectionDialog(
+    icon: IpackIcon,
+    isSelectAction: Boolean,
+    onDismissRequest: () -> Unit,
+    onVariantSelected: (IpackIcon, Boolean) -> Unit,
+    onExportAction: (IpackIcon) -> Unit
+) {
+    Dialog(onDismissRequest = onDismissRequest) {
+        Surface(
+            shape = MaterialTheme.shapes.extraLarge,
+            tonalElevation = 6.dp,
+            modifier = Modifier
+                .width(IntrinsicSize.Max)
+                .heightIn(min = 200.dp)
+                .padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Image(
+                    painter = painterResource(id = icon.lightResId),
+                    contentDescription = icon.name,
+                    modifier = Modifier.size(64.dp),
+                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onSurface)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = icon.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+
+                if (!isSelectAction) {
+                    Button(
+                        onClick = { onExportAction(icon) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Export icon as a PNG")
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Copy Resource URI for Tasker",
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { onVariantSelected(icon, false) },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Light Icon")
+                    }
+                    Button(
+                        onClick = { onVariantSelected(icon, true) },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Dark Icon")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun SearchBar(
     query: String,
     onQueryChanged: (String) -> Unit,
@@ -224,7 +296,7 @@ fun SearchBar(
         placeholder = { Text("Search icons...") },
         leadingIcon = {
             Icon(
-                painter = painterResource(id = com.ipack.icons.R.drawable.search_web),
+                painter = painterResource(id = R.drawable.search_web_light),
                 contentDescription = null,
                 modifier = Modifier.size(24.dp)
             )
@@ -233,7 +305,7 @@ fun SearchBar(
             if (query.isNotEmpty()) {
                 IconButton(onClick = { onQueryChanged("") }) {
                     Icon(
-                        painter = painterResource(id = com.ipack.icons.R.drawable.close),
+                        painter = painterResource(id = R.drawable.close_light),
                         contentDescription = "Clear search",
                         modifier = Modifier.size(24.dp)
                     )
@@ -255,9 +327,13 @@ fun IpackIconHeader(uiState: IpackIconUiState) {
         val annotatedString = buildAnnotatedString {
             withStyle(style = SpanStyle(fontStyle = FontStyle.Italic)) {
                 append("Icons: ")
-                append(uiState.icons.size.toString())
-                uiState.iconDimensions?.let {
-                    append(" (${it.x}x${it.y} dp)")
+                if (uiState.isLoading) {
+                    append("loading...")
+                } else {
+                    append(uiState.icons.size.toString())
+                    uiState.iconDimensions?.let {
+                        append(" (${it.x}x${it.y} dp)")
+                    }
                 }
                 append("\nSource: ")
             }
@@ -294,7 +370,7 @@ fun IpackIconGrid(
     iconSize: Int,
     contentColor: Color,
     onIconSelected: (IpackIcon) -> Unit,
-    bottomPadding: androidx.compose.ui.unit.Dp = 0.dp
+    bottomPadding: Dp = 0.dp
 ) {
     val state = rememberLazyGridState()
 
@@ -338,7 +414,7 @@ fun IpackIconGrid(
         ) {
             items(
                 items = icons,
-                key = { it.resourceName }
+                key = { it.name }
             ) { icon ->
                 IpackIconItem(
                     icon = icon,
@@ -361,7 +437,7 @@ fun IpackIconItem(
     onClick: () -> Unit
 ) {
     val wrappedName = icon.name.replace("_", "_\u200B")
-    
+
     Column(
         modifier = Modifier
             .width(cellSize.dp)
@@ -372,7 +448,7 @@ fun IpackIconItem(
         verticalArrangement = Arrangement.Center
     ) {
         Image(
-            painter = painterResource(id = icon.id),
+            painter = painterResource(id = icon.lightResId),
             contentDescription = icon.name,
             modifier = Modifier.size(iconSize.dp),
             colorFilter = ColorFilter.tint(contentColor)
@@ -400,7 +476,7 @@ fun IpackIconHeaderPreview() {
     IpackMaterialIconsTheme {
         IpackIconHeader(
             uiState = IpackIconUiState(
-                icons = List(100) { IpackIcon(0, "icon", "icon") },
+                icons = List(100) { IpackIcon(name = "icon $it", darkResId = 0, lightResId = 0) },
                 isLoading = false,
                 label = IpackContent.LABEL,
                 attribution = IpackContent.ATTRIBUTION,
@@ -415,7 +491,11 @@ fun IpackIconHeaderPreview() {
 fun IpackIconItemPreview() {
     IpackMaterialIconsTheme {
         IpackIconItem(
-            icon = IpackIcon(android.R.drawable.ic_menu_search, "search_icon_with_a_very_long_name", "search"),
+            icon = IpackIcon(
+                name = "search_icon_with_a_very_long_name",
+                darkResId = android.R.drawable.ic_menu_search,
+                lightResId = android.R.drawable.ic_menu_search,
+            ),
             cellSize = IpackContent.DEFAULT_CELL_SIZE,
             iconSize = IpackContent.DEFAULT_ICON_SIZE,
             contentColor = MaterialTheme.colorScheme.onSurface,
@@ -430,7 +510,13 @@ fun IpackIconSelectContentPreview() {
     IpackMaterialIconsTheme {
         IpackIconSelectScreen(
             uiState = IpackIconUiState(
-                icons = List(100) { IpackIcon(android.R.drawable.ic_menu_gallery, "icon $it", "icon_$it") },
+                icons = List(100) {
+                    IpackIcon(
+                        name = "icon $it",
+                        darkResId = android.R.drawable.ic_menu_gallery,
+                        lightResId = android.R.drawable.ic_menu_gallery,
+                    )
+                },
                 isLoading = false,
                 gridBackColour = IpackContent.DEFAULT_GRID_BACK_COLOUR,
                 attribution = IpackContent.ATTRIBUTION

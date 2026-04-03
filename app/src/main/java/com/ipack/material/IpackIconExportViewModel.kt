@@ -56,8 +56,8 @@ class IpackIconExportViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(
         IpackIconExportUiState(
             icon = IpackContent.getIcon(
-                context,
-                savedStateHandle.toRoute<ExportDestination>().iconId
+                context = context,
+                name = savedStateHandle.toRoute<ExportDestination>().iconName
             ),
         )
     )
@@ -76,9 +76,12 @@ class IpackIconExportViewModel @Inject constructor(
     }
 
     fun updateHexCode(hex: String) {
-        _uiState.update { it.copy(hexCode = hex) }
+        val filtered = hex.filter { it.isDigit() || it in 'A'..'F' || it in 'a'..'f' }.uppercase()
+        if (filtered.length > 8) return
+
+        _uiState.update { it.copy(hexCode = filtered) }
         try {
-            val sanitizedHex = if (hex.startsWith("#")) hex else "#$hex"
+            val sanitizedHex = "#$filtered"
             val colorInt = sanitizedHex.toColorInt()
             val color = Color(colorInt)
             _uiState.update { it.copy(selectedColor = color) }
@@ -109,7 +112,13 @@ class IpackIconExportViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(isLoading = true) }
             try {
-                exportDrawable(context, icon.id, size, color, uri)
+                exportDrawable(
+                    context = context,
+                    resId = icon.lightResId,
+                    size = size,
+                    color = color,
+                    uri = uri
+                )
                 _events.emit(ExportEvent.Success("Icon exported successfully"))
             } catch (e: Exception) {
                 Log.e(tag, "exportIcon", e)
@@ -122,8 +131,8 @@ class IpackIconExportViewModel @Inject constructor(
 
     private fun exportDrawable(
         context: Context,
-        size: Int,
         resId: Int,
+        size: Int,
         color: Color,
         uri: Uri
     ) {

@@ -34,7 +34,7 @@ fun IpackAppNavigation(
         composable<SelectDestination> {
             IpackIconSelectRoute(
                 onNavigateToExport = { icon ->
-                    navController.navigate(ExportDestination(iconId = icon.id))
+                    navController.navigate(ExportDestination(iconName = icon.name))
                 },
                 onResult = onResult,
             )

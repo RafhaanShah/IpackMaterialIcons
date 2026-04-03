@@ -1,6 +1,8 @@
 package com.ipack.material
 
+import android.annotation.SuppressLint
 import android.content.Context
+import android.content.res.Configuration
 import android.util.Log
 
 object IpackContent {
@@ -16,27 +18,51 @@ object IpackContent {
     const val HEX_FORMAT: String = "%08X"
     const val PNG_MIME_TYPE: String = "image/png"
     const val PNG_EXTENSION: String = ".png"
+    const val DRAWABLE_RESOURCE_TYPE: String = "drawable"
+    const val LIGHT_SUFFIX = "_light"
+    const val DARK_SUFFIX = "_dark"
 
     private val tag = IpackContent::class.simpleName
 
-    fun getIcons(): List<IpackIcon> {
+    fun getIcons(context: Context): List<IpackIcon> {
         val drawableClass = com.ipack.icons.R.drawable::class.java
-        return drawableClass.fields.mapNotNull { field ->
+        Log.d(tag, "getIcons: ${drawableClass.name}")
+        val icons = mutableMapOf<String, IpackIcon>()
+        drawableClass.fields.mapNotNull { field ->
             try {
                 if (field.type == Int::class.javaPrimitiveType) {
-                    val id = field.getInt(null)
-                    val name = field.name
-                    IpackIcon(id = id, name = name, resourceName = name)
-                } else null
+                    val name = field.name.removeSuffix(LIGHT_SUFFIX).removeSuffix(DARK_SUFFIX)
+                    icons.putIfAbsent(name, getIcon(context, name))
+                }
             } catch (e: Exception) {
-                Log.e(tag, "getIcons ${field.name}", e)
+                Log.e(tag, "getIcons: ${field.name}", e)
                 null
             }
-        }.sortedBy { it.name.lowercase() }
+        }
+
+        Log.d(tag, "getIcons result:${icons.size}")
+        return icons.values.sortedBy { it.name.lowercase() }
     }
 
-    fun getIcon(context: Context, id: Int): IpackIcon {
-        val name = context.resources.getResourceEntryName(id)
-        return IpackIcon(id = id, name = name, resourceName = name)
+    @SuppressLint("DiscouragedApi")
+    fun getIcon(context: Context, name: String): IpackIcon {
+        val packageName = context.packageName
+        val darkResName = "${name}$LIGHT_SUFFIX"
+        val lightResName = "${name}${DARK_SUFFIX}"
+        val darkResId =
+            context.resources.getIdentifier(darkResName, DRAWABLE_RESOURCE_TYPE, packageName)
+        val lightResId =
+            context.resources.getIdentifier(lightResName, DRAWABLE_RESOURCE_TYPE, packageName)
+        return IpackIcon(
+            name = name,
+            darkResId = darkResId,
+            lightResId = lightResId,
+        )
     }
+
+    fun isDarkMode(context: Context): Boolean =
+        when (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) {
+            Configuration.UI_MODE_NIGHT_YES -> true
+            else -> false
+        }
 }

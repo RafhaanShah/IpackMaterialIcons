@@ -1,9 +1,5 @@
 import com.android.ide.common.vectordrawable.Svg2Vector
-import org.gradle.api.DefaultTask
-import org.gradle.api.tasks.*
-import java.io.File
 import java.nio.file.Files
-import kotlin.text.replace
 
 plugins {
     alias(libs.plugins.android.library)
@@ -21,7 +17,9 @@ android {
 
     buildTypes {
         release {
+            isShrinkResources = false
             isMinifyEnabled = false
+            isPseudoLocalesEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -82,27 +80,47 @@ abstract class SvgToVectorTask : DefaultTask() {
     @TaskAction
     fun run() {
         val outDir = outputDir.get().asFile
-        val drawableFolder = File(outDir, "drawable")
-        if (!drawableFolder.exists()) drawableFolder.mkdirs()
+        val drawableFolder = File(outDir, "drawable").apply { if (!exists()) mkdirs() }
         if (!inputDir.exists()) return
 
         inputDir.walkTopDown()
             .filter { it.isFile && it.extension == "svg" }
             .forEach { svgFile ->
                 val rawName = svgFile.nameWithoutExtension.lowercase().replace("-", "_")
-                val fileName = when {
+                val baseName = when {
                     reservedKeywords.contains(rawName) -> "${rawName}_icon"
                     rawName.firstOrNull()?.isDigit() == true -> "icon_$rawName"
                     else -> rawName
                 }
 
-                val drawableFile = File(drawableFolder, "$fileName.xml")
-                drawableFile.parentFile.mkdirs()
-                val errorLog  = Svg2Vector.parseSvgToXml(svgFile.toPath(), Files.newOutputStream(drawableFile.toPath()))
-                if (errorLog.isNotEmpty()) {
-                    println("SVG conversion warning for ${svgFile.name}:")
-                    println(errorLog.toString())
-                }
+                // 1. Generate Dark Version (Original)
+                val darkFile = File(drawableFolder, "${baseName}_dark.xml")
+                convertSvg(svgFile, darkFile)
+
+                // 2. Generate Light Version (Modified Fill)
+                val lightFile = File(drawableFolder, "${baseName}_light.xml")
+                convertSvg(svgFile, lightFile)
+                applyWhiteFill(lightFile)
             }
+    }
+
+    private fun convertSvg(source: File, destination: File) {
+        destination.parentFile.mkdirs()
+        val errorLog =
+            Svg2Vector.parseSvgToXml(source.toPath(), Files.newOutputStream(destination.toPath()))
+        if (errorLog.isNotEmpty()) {
+            println("SVG conversion warning for ${source.name}: $errorLog")
+        }
+    }
+
+    private fun applyWhiteFill(file: File) {
+        val content = file.readText()
+        // Regex targets android:fillColor attributes.
+        // This replaces any hex or named color with white (#FFFFFFFF)
+        val modifiedContent = content.replace(
+            Regex("""android:fillColor="[^"]*""""),
+            """android:fillColor="#FFFFFFFF""""
+        )
+        file.writeText(modifiedContent)
     }
 }

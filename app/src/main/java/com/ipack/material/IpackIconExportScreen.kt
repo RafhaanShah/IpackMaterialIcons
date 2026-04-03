@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
@@ -60,7 +61,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class ExportDestination(val iconId: Int)
+data class ExportDestination(val iconName: String)
 
 @Composable
 fun IpackIconExportRoute(
@@ -133,7 +134,7 @@ fun IpackIconExportScreen(
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(
-                            painter = painterResource(id = com.ipack.icons.R.drawable.arrow_left),
+                            painter = painterResource(id = com.ipack.icons.R.drawable.arrow_left_light),
                             contentDescription = "Back",
                             modifier = Modifier.size(24.dp)
                         )
@@ -185,7 +186,7 @@ fun IpackIconExportScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Image(
-                    painter = painterResource(id = uiState.icon.id),
+                    painter = painterResource(id = uiState.icon.darkResId),
                     contentDescription = uiState.icon.name,
                     modifier = Modifier.size(128.dp),
                     colorFilter = ColorFilter.tint(uiState.selectedColor)
@@ -245,7 +246,12 @@ fun IpackIconExportScreen(
                         modifier = Modifier.fillMaxWidth(),
                         prefix = { Text("#") },
                         textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-                        singleLine = true
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Characters,
+                            autoCorrectEnabled = false,
+                            keyboardType = KeyboardType.Ascii
+                        )
                     )
                 }
             }
@@ -318,15 +324,15 @@ fun Modifier.checkerboard(
 @Composable
 fun IpackIconExportScreenPreview() {
     val mockIcon = IpackIcon(
-        id = android.R.drawable.ic_menu_gallery,
-        name = "Gallery Icon",
-        resourceName = "ic_menu_gallery"
+        name = "ic_menu_gallery",
+        darkResId = android.R.drawable.ic_menu_gallery,
+        lightResId = android.R.drawable.ic_menu_gallery,
     )
     IpackMaterialIconsTheme {
         IpackIconExportScreen(
             uiState = IpackIconExportUiState(
                 icon = mockIcon,
-                fileName = "Gallery Icon",
+                fileName = "ic_menu_gallery",
                 selectedColor = Color.White
             ),
         )
