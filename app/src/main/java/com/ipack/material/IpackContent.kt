@@ -11,7 +11,9 @@ object IpackContent {
 
     const val DEFAULT_CELL_SIZE: Int = 72
     const val DEFAULT_ICON_SIZE: Int = 48
+    const val DEFAULT_ICON_EXPORT_SIZE: Int = 128
     const val DEFAULT_GRID_BACK_COLOUR: Int = 0 // 0 indicates use theme default
+    const val HEX_FORMAT = "%08X"
 
     private val tag = IpackContent::class.simpleName
 

@@ -142,6 +142,7 @@ class IpackIconSelectViewModel @Inject constructor(
     }
 
     fun onIconSelected(icon: IpackIcon) {
+        Log.i(tag, "onIconSelected: $icon")
         val state = uiState.value
         if (state.isSelectAction) {
             val dataString = getTaskerDataString(icon)

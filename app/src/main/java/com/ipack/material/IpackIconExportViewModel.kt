@@ -15,6 +15,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
+import com.ipack.material.IpackContent.DEFAULT_ICON_EXPORT_SIZE
+import com.ipack.material.IpackContent.HEX_FORMAT
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -26,15 +28,15 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.util.Locale
 import javax.inject.Inject
+
 
 data class IpackIconExportUiState(
     val icon: IpackIcon,
     val selectedColor: Color = Color.White,
-    val hexCode: String = "FFFFFFFF",
+    val hexCode: String = Color.White.toHexString(),
     val fileName: String = icon.name,
-    val iconSizeInput: String = "128",
+    val iconSizeInput: String = DEFAULT_ICON_EXPORT_SIZE.toString(),
     val showDialog: Boolean = false,
     val isLoading: Boolean = false,
 )
@@ -64,12 +66,11 @@ class IpackIconExportViewModel @Inject constructor(
     private val _events = MutableSharedFlow<ExportEvent>()
     val events: SharedFlow<ExportEvent> = _events.asSharedFlow()
 
-
     fun updateColor(color: Color) {
         _uiState.update {
             it.copy(
                 selectedColor = color,
-                hexCode = String.format(Locale.US, "%08X", color.toArgb())
+                hexCode = color.toHexString()
             )
         }
     }
@@ -99,6 +100,7 @@ class IpackIconExportViewModel @Inject constructor(
     }
 
     fun exportIcon(context: Context, uri: Uri) {
+        Log.i(tag, "exportIcon: $uri")
         val state = _uiState.value
         val icon = state.icon
         val size = state.iconSizeInput.toIntOrNull() ?: 128
@@ -107,19 +109,7 @@ class IpackIconExportViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(isLoading = true) }
             try {
-                val bitmap = createBitmap(size, size)
-                val canvas = Canvas(bitmap)
-                val drawable = ContextCompat.getDrawable(context, icon.id)
-                drawable?.let { d ->
-                    val wrapped = DrawableCompat.wrap(d).mutate()
-                    DrawableCompat.setTint(wrapped, color.toArgb())
-                    wrapped.setBounds(0, 0, size, size)
-                    wrapped.draw(canvas)
-                }
-
-                context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
-                }
+                exportDrawable(context, icon.id, size, color, uri)
                 _events.emit(ExportEvent.Success("Icon exported successfully"))
             } catch (e: Exception) {
                 Log.e(tag, "exportIcon", e)
@@ -129,4 +119,26 @@ class IpackIconExportViewModel @Inject constructor(
             }
         }
     }
+
+    private fun exportDrawable(
+        context: Context,
+        size: Int,
+        resId: Int,
+        color: Color,
+        uri: Uri
+    ) {
+        val bitmap = createBitmap(size, size)
+        val canvas = Canvas(bitmap)
+        val drawable = requireNotNull(ContextCompat.getDrawable(context, resId))
+        val wrapped = DrawableCompat.wrap(drawable).mutate()
+        DrawableCompat.setTint(wrapped, color.toArgb())
+        wrapped.setBounds(0, 0, size, size)
+        wrapped.draw(canvas)
+
+        requireNotNull(context.contentResolver.openOutputStream(uri)).use { outputStream ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+        }
+    }
 }
+
+private fun Color.toHexString(): String = String.format(HEX_FORMAT, toArgb())
