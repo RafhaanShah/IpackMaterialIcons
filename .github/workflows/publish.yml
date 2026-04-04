@@ -49,14 +49,6 @@ jobs:
           # Update versionName = tag
           sed -i "s/versionName = \".*\"/versionName = \"${{ steps.vars.outputs.tag }}\"/" $file
 
-      - name: Commit version changes
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git add app/build.gradle.kts
-          git commit -m "Bump version to ${{ steps.vars.outputs.tag }}"
-          git push origin HEAD:refs/heads/main
-
       - name: Decode Keystore
         run: |
           mkdir -p app/keystore
@@ -80,6 +72,15 @@ jobs:
           fail_on_unmatched_tag: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Commit version changes
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add app/build.gradle.kts
+          git diff-index --quiet HEAD || git commit -m "Bump version to ${{ steps.vars.outputs.tag }}"
+          git pull --rebase origin main
+          git push origin HEAD:refs/heads/main
 
       - name: Clean up Keystore
         if: always()
