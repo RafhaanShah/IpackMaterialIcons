@@ -60,7 +60,10 @@ jobs:
         run: ./gradlew assembleRelease
 
       - name: Rename APK for Upload
-        run: mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/IpackMaterialIcons-${{ steps.vars.outputs.tag }}.apk
+        run: |
+          REPO_NAME="${{ github.event.repository.name }}"
+          TAG="${{ steps.vars.outputs.tag }}"
+          mv app/build/outputs/apk/release/app-release.apk "app/build/outputs/apk/release/${REPO_NAME}-${TAG}.apk"
 
       - name: Upload APK
         uses: softprops/action-gh-release@v2
@@ -79,8 +82,8 @@ jobs:
           git config user.email "actions@github.com"
           git add app/build.gradle.kts
           git diff-index --quiet HEAD || git commit -m "Bump version to ${{ steps.vars.outputs.tag }}"
-          git pull --rebase origin main
-          git push origin HEAD:refs/heads/main
+          git pull --rebase origin ${GITHUB_REF}
+          git push origin HEAD:${GITHUB_REF}
 
       - name: Clean up Keystore
         if: always()
