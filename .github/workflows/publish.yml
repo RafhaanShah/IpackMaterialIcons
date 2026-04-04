@@ -1,0 +1,86 @@
+# This workflow will build and publish an APK to the latest release
+# See https://github.com/softprops/action-gh-release
+
+name: Publish APK
+
+on:
+  release:
+    types: [ "published" ]
+
+jobs:
+  publish_to_release:
+    name: Publish APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Set version variable
+        id: vars
+        run: echo "tag=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: true
+          fetch-depth: 1
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Update build.gradle version info
+        run: |
+          file="app/build.gradle.kts"
+          
+          # Extract current versionCode using = as a delimiter
+          versionCode=$(grep "versionCode =" $file | awk '{print $NF}')
+          newCode=$((versionCode + 1))
+          
+          # Update versionCode + 1
+          sed -i "s/versionCode = $versionCode/versionCode = $newCode/" $file
+          
+          # Update versionName = tag
+          sed -i "s/versionName = \".*\"/versionName = \"${{ steps.vars.outputs.tag }}\"/" $file
+
+      - name: Commit version changes
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add app/build.gradle.kts
+          git commit -m "Bump version to ${{ steps.vars.outputs.tag }}"
+          git push origin HEAD:main
+
+      - name: Decode Keystore
+        run: |
+          mkdir -p app/keystore
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/keystore/release.jks
+
+      - name: Build APK with Gradle
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: ./gradlew assembleRelease
+
+      - name: Rename APK for Upload
+        run: mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/IpackMaterialIcons-${{ steps.vars.outputs.tag }}.apk
+
+      - name: Upload APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          files: app/build/outputs/apk/release/*.apk
+          append_body: true
+          generate_release_notes: true
+          fail_on_unmatched_tag: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clean up Keystore
+        if: always()
+        run: rm -f app/keystore/release.jks || echo "Failed to delete keystore"

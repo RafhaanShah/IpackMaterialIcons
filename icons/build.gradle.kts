@@ -12,7 +12,7 @@ android {
     defaultConfig {
         minSdk = 30
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        consumerProguardFiles("consumer-rules.pro")
+        consumerProguardFiles("consumer-rules.pro", "proguard-rules.pro")
     }
 
     buildTypes {

@@ -80,7 +80,7 @@ class IpackIconSelectViewModel @Inject constructor(
     private val filteredIcons = combine(
         searchQuery.debounce(300L).distinctUntilChanged(),
         allIcons
-    ) { query, icons -> query.lowercase().replace(" ", "_") to icons }
+    ) { query, icons -> query.lowercase().trim().replace(" ", "_") to icons }
         .scan(Pair("", emptyList<IpackIcon>())) { accumulator, current ->
             val (prevQuery, prevList) = accumulator
             val (newQuery, allIcons) = current

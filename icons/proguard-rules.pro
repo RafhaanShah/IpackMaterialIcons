@@ -22,12 +22,17 @@
 
 # Keep the R class and all its inner classes (drawable, string, etc.)
 -keep class **.R$* {
-    public static <fields>;
+    <fields>;
 }
 
-# Prevent R8 from optimizing/inlining the resource IDs
--dontoptimize
--dontobfuscate
+# Explicitly keep the R class itself
+-keep class **.R {
+    <fields>;
+}
+
+-keepclassmembers class **.R$* {
+    public static <fields>;
+}
 
 # Specific to resources if using certain libraries
 -keepattributes InnerClasses
