@@ -15,6 +15,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -53,6 +55,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
@@ -118,7 +121,7 @@ fun IpackIconSelectRoute(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun IpackIconSelectScreen(
     uiState: IpackIconUiState,
@@ -128,8 +131,15 @@ fun IpackIconSelectScreen(
     onVariantSelected: (IpackIcon, Boolean) -> Unit = { _, _ -> },
     onExportAction: (IpackIcon) -> Unit = {},
 ) {
-    BackHandler(enabled = uiState.searchQuery.isNotEmpty()) {
-        onSearchQueryChanged("")
+    val isKeyboardVisible = WindowInsets.isImeVisible
+    val focusManager = LocalFocusManager.current
+
+    BackHandler(enabled = uiState.searchQuery.isNotEmpty() || isKeyboardVisible) {
+        if (isKeyboardVisible) {
+            focusManager.clearFocus()
+        } else {
+            onSearchQueryChanged("")
+        }
     }
 
     val backgroundColor = if (uiState.gridBackColour != IpackContent.DEFAULT_GRID_BACK_COLOUR) {

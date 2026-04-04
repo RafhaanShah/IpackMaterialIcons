@@ -15,7 +15,6 @@ import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,8 +25,10 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -76,25 +77,32 @@ class IpackIconSelectViewModel @Inject constructor(
     private val _events = MutableSharedFlow<IpackIconSelectEvent>()
     val events: SharedFlow<IpackIconSelectEvent> = _events.asSharedFlow()
 
-    // debounce and flatmap so new updates immediately cancel previous operations
-    @OptIn(ExperimentalCoroutinesApi::class)
     private val filteredIcons = combine(
-        searchQuery.debounce { if (it.isEmpty()) 0L else 300L }.distinctUntilChanged(),
+        searchQuery.debounce(300L).distinctUntilChanged(),
         allIcons
-    ) { query, allIcons -> query to allIcons }
-        .flatMapLatest { (query, allIcons) ->
-            flow {
-                val filtered = if (query.isBlank()) {
-                    allIcons
-                } else {
-                    withContext(Dispatchers.Default) {
-                        allIcons.filter { it.name.contains(query.lowercase()) }
-                    }
+    ) { query, icons -> query.lowercase().replace(" ", "_") to icons }
+        .scan(Pair("", emptyList<IpackIcon>())) { accumulator, current ->
+            val (prevQuery, prevList) = accumulator
+            val (newQuery, allIcons) = current
+
+            val result = when {
+                // Case 1: Search cleared
+                newQuery.isBlank() -> allIcons
+
+                // Case 2: Refinement (e.g., "a" -> "ab")
+                newQuery.startsWith(prevQuery) && prevQuery.isNotEmpty() -> {
+                    prevList.filter { it.name.contains(newQuery) }
                 }
-                emit(filtered)
-                isFilteringIcons.value = false
+
+                // Case 3: Deletion (e.g., "ab" -> "a") or new search
+                else -> allIcons.filter { it.name.contains(newQuery) }
             }
+
+            newQuery to result
         }
+        .map { it.second }
+        .flowOn(Dispatchers.Default)
+        .onEach { isFilteringIcons.value = false }
 
     val uiState: StateFlow<IpackIconUiState> = combine(
         baseUiState,
