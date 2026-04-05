@@ -63,6 +63,16 @@ height="80">](https://apps.obtainium.imranr.dev/)
 
 </details>
 
+<details>
+<summary><b>Dynamic Dark / Light Icon</b></summary>
+
+1. **Create a new Tasker Profile:** State -> Display -> Dark Mode.
+2. **Enter Task:** Set Variable -> `%IconColor` to `light` (so we use the light icon in Dark Mode)
+3. **Exit Task:** Set Variable -> `%IconColor` to `dark` (so we use the dark icon in Light Mode)
+4. **Icon Task:** Set your icon to `android.resource://com.ipack.material/icon_%IconColor`
+
+</details>
+
 ## Building
 
 ### Prerequisites
@@ -92,6 +102,11 @@ git clone --recursive --shallow-submodules https://github.com/RafhaanShah/IpackM
 - For feature requests and issues please make a GitHub
   issue [here](https://github.com/RafhaanShah/IpackMaterialIcons/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc)
   with details
+
+## Third Party Libraries
+
+- [skydoves/colorpicker-compose](https://github.com/skydoves/colorpicker-compose)
+- [nanihadesuka/LazyColumnScrollbar](https://github.com/nanihadesuka/LazyColumnScrollbar)
 
 ## License
 
