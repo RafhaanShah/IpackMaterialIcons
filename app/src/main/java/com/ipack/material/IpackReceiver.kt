@@ -74,7 +74,7 @@ class IpackReceiver : BroadcastReceiver() {
         val isDark = isDarkMode(context)
         val bundle = getResultExtras(true)
         getIcons(context).forEach { icon ->
-            bundle.putInt(icon.name, icon.getResId(isDark))
+            bundle.putInt(icon.name, icon.getResId(!isDark))
         }
     }
 }

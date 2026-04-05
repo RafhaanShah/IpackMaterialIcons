@@ -9,6 +9,11 @@ data class IpackIcon(
     val darkResName: String = "${name}${IpackContent.DARK_SUFFIX}"
     val lightResName: String = "${name}${IpackContent.LIGHT_SUFFIX}"
 
+    init {
+        require(darkResId != 0) { "Invalid resource Id: $darkResId" }
+        require(lightResId != 0) { "Invalid resource Id: $lightResId" }
+    }
+
     fun getResId(isDark: Boolean = false) = if (isDark) darkResId else lightResId
     fun getResName(isDark: Boolean = false) = if (isDark) darkResName else lightResName
 }

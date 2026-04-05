@@ -80,7 +80,7 @@ class IpackIconSelectViewModel @Inject constructor(
     private val filteredIcons = combine(
         searchQuery.debounce(300L).distinctUntilChanged(),
         allIcons
-    ) { query, icons -> query.lowercase().trim().replace(" ", "_") to icons }
+    ) { query, icons -> query to icons }
         .scan(Pair("", emptyList<IpackIcon>())) { accumulator, current ->
             val (prevQuery, prevList) = accumulator
             val (newQuery, allIcons) = current
@@ -152,10 +152,11 @@ class IpackIconSelectViewModel @Inject constructor(
     }
 
     fun onSearchQueryUpdate(query: String) {
-        if (searchQuery.value != query) {
+        val sanitizedQuery = query.trim().replace(" ", "_").lowercase()
+        if (searchQuery.value != sanitizedQuery) {
             // set filtering true so we immediately show the loading icon
             isFilteringIcons.value = true
-            searchQuery.value = query
+            searchQuery.value = sanitizedQuery
         }
     }
 
